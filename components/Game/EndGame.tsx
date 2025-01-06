@@ -12,7 +12,7 @@ import { Board } from '../Board/Board';
 
 export const EndGame = () => {
   //const chess = useConst(() => new Chess('1K6/7r/1k6/8/8/8/8/8 b KQkq - 0 1'))
-  const { chess, highlightedPiece, setPossibleMoves, gameState, isPromotiong } = useGame();
+  const { chess, highlightedPiece, setPossibleMoves, gameState, isPromoting } = useGame();
 
   useEffect(() => {
     if (highlightedPiece) {
@@ -49,7 +49,7 @@ export const EndGame = () => {
           }),
         )}
       </View>
-      {isPromotiong ? <PromotionDialog color={getDifferentColor(gameState.player)} /> : null}
+      {isPromoting ? <PromotionDialog color={getDifferentColor(gameState.player)} /> : null}
     </>
   );
 };

@@ -1,6 +1,6 @@
-import { Chess, Move } from 'chess.js';
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { runOnJS } from 'react-native-reanimated';
+import { Chess, Move } from 'chess.js';
 import { useConst } from './useConst';
 import { Game, HighilghtedPiece } from '@/constants/types';
 
@@ -8,7 +8,7 @@ interface GameContextProps {
   chess: Chess;
   gameState: Game;
   setGameState: (value: Game) => void;
-  isPromotiong: boolean;
+  isPromoting: boolean;
   setIsPromoting: (value: boolean) => void;
   currentMove: Move | undefined;
   setCurrentMove: (value: Move) => void;
@@ -22,120 +22,143 @@ interface GameContextProps {
   checkPossibleCapturingMove: (to: string) => boolean;
 }
 
-const GameContext = createContext<GameContextProps>({
-  chess: new Chess(),
-  gameState: {
-    player: 'w',
-    board: [],
-  },
-  setGameState: () => {},
-  isPromotiong: false,
-  setIsPromoting: () => {},
-  currentMove: undefined,
-  setCurrentMove: () => {},
-  highlightedPiece: null,
-  setHighlightedPiece: () => {},
-  possibleMoves: [],
-  setPossibleMoves: () => {},
-  handleMove: () => {},
-  handlePromotingPiece: () => {},
-  checkPossibleMove: () => false,
-  checkPossibleCapturingMove: () => false,
-});
+const GameContext = createContext<GameContextProps | undefined>(undefined);
 
-const GameProvider = ({ children }: { children: any }) => {
-  const chess = useConst(() => new Chess('1K6/7r/1k6/8/8/8/8/8 b KQkq - 0 1'));
-  const [gameState, setGameState] = useState<Game>({
-    player: 'w',
-    board: chess.board(),
-  });
-  const [isPromotiong, setIsPromoting] = useState(false);
+const GameProvider = ({ children }: { children: React.ReactNode }) => {
+  const chess = useConst(() => new Chess());
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const [gameState, setGameState] = useState<Game>({ player: 'w', board: chess.board() });
+  const [isPromoting, setIsPromoting] = useState(false);
   const [currentMove, setCurrentMove] = useState<Move>();
   const [highlightedPiece, setHighlightedPiece] = useState<HighilghtedPiece | null>(null);
   const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
 
+  useEffect(() => {
+    const ws = new WebSocket('ws://192.168.1.102:8080');
+    wsRef.current = ws;
+
+    ws.onopen = () => {};
+    ws.onmessage = (event) => handleStockfishMove(event.data);
+    ws.onclose = () => {};
+    ws.onerror = (error) => console.error('WebSocket error:', error);
+
+    return () => ws.close();
+  }, []);
+
+  const updateGameState = () => {
+    setGameState({
+      player: chess.turn(),
+      board: chess.board(),
+    });
+  };
+
+  const handleStockfishMove = (data: string) => {
+    const move = chess.move(data);
+    if (move) {
+      updateGameState();
+    } else {
+      console.error(`Invalid move received from Stockfish: ${data}`);
+    }
+  };
+
+  const handlePlayerMove = (from: string, to: string) => {
+    const move = chess.move({ from, to });
+    if (move) {
+      updateGameState();
+      wsRef.current?.send(`${from}${to}`);
+    } else {
+      console.error('Invalid player move');
+    }
+  };
+
   const handleMove = useCallback(
     (from: string, to: string, resetPosition: () => void) => {
       try {
-        const moves = chess.moves({ verbose: true });
-        const move = moves.find((m) => m.from === from && m.to === to);
-        if (move) {
-          if (move.piece === 'p' && ['1', '8'].includes(move.to[1])) {
-            setIsPromoting(true);
-            setCurrentMove(move);
+        if (chess.turn() === 'w') {
+          const move = chess.moves({ verbose: true }).find((m) => m.from === from && m.to === to);
+          if (move) {
+            if (move.piece === 'p' && ['1', '8'].includes(move.to[1])) {
+              setIsPromoting(true);
+              setCurrentMove(move);
+            } else {
+              handlePlayerMove(from, to);
+            }
+            clearHighlight();
           } else {
-            chess.move(move);
-            setGameState({
-              player: chess.turn(),
-              board: chess.board(),
-            });
+            resetPositionSafely(resetPosition);
           }
-          setHighlightedPiece(null);
-          setPossibleMoves([]);
         } else {
-          runOnJS(resetPosition)();
+          resetPositionSafely(resetPosition);
         }
-      } catch (error) {
-        runOnJS(resetPosition)();
+      } catch {
+        resetPositionSafely(resetPosition);
       }
     },
-    [gameState, chess],
+    [chess]
   );
+
+  const resetPositionSafely = (resetPosition: () => void) => {
+    runOnJS(resetPosition)();
+  };
 
   const handlePromotingPiece = (piece: string) => {
     if (currentMove) {
-      chess.move({ ...currentMove, promotion: piece[1] });
-      setGameState({
-        player: chess.turn(),
-        board: chess.board(),
-      });
+      const move = chess.move({ ...currentMove, promotion: piece[1] });
+      if (move) {
+        updateGameState();
+        wsRef.current?.send(`${move.from}${move.to}${piece[1].toLowerCase()}`);
+      }
     }
     setIsPromoting(false);
   };
 
+  const clearHighlight = () => {
+    setHighlightedPiece(null);
+    setPossibleMoves([]);
+  };
+
   const checkPossibleMove = (to: string) => {
-    const possibleMove =
-      highlightedPiece?.piece === 'p' ? to : `${highlightedPiece?.piece.toLocaleUpperCase()}${to}`;
-    const possibleCapturingMove =
-      highlightedPiece?.piece === 'p'
-        ? `${highlightedPiece.from[0]}x${to}`
-        : `${highlightedPiece?.piece.toLocaleUpperCase()}x${to}`;
-    const castles =
-      highlightedPiece?.piece === 'k' && ['g8', 'c8', 'g1', 'c1'].includes(to)
-        ? ['O-O', 'O-O-O']
-        : [];
-    const movesToCheck = [
-      possibleMove,
-      possibleCapturingMove,
-      `${possibleMove}+`,
-      `${possibleMove}#`,
-      `${possibleCapturingMove}+`,
-      `${possibleCapturingMove}#`,
-      `${possibleMove}=Q`,
-      `${possibleMove}=Q+`,
-      `${possibleMove}=Q#`,
-      `${possibleCapturingMove}=Q`,
-      `${possibleCapturingMove}=Q+`,
-      `${possibleCapturingMove}=Q#`,
-      ...castles,
-    ];
-    return movesToCheck.some((item) => possibleMoves.includes(item));
+    return generateMovePatterns(to).some((item) => possibleMoves.includes(item));
   };
 
   const checkPossibleCapturingMove = (to: string) => {
-    const possibleCapturingMove =
-      highlightedPiece?.piece === 'p'
-        ? `${highlightedPiece.from[0]}x${to}`
-        : `${highlightedPiece?.piece.toLocaleUpperCase()}x${to}`;
-    const movesToCheck = [
-      possibleCapturingMove,
-      `${possibleCapturingMove}+`,
-      `${possibleCapturingMove}#`,
-      `${possibleCapturingMove}=Q`,
-      `${possibleCapturingMove}=Q+`,
-      `${possibleCapturingMove}=Q#`,
+    return generateCapturingPatterns(to).some((item) => possibleMoves.includes(item));
+  };
+
+  const generateMovePatterns = (to: string) => {
+    const piece = highlightedPiece?.piece ?? '';
+    const fromFile = highlightedPiece?.from[0] ?? '';
+    const baseMove = piece === 'p' ? to : `${piece.toUpperCase()}${to}`;
+    const capturingMove = piece === 'p' ? `${fromFile}x${to}` : `${piece.toUpperCase()}x${to}`;
+    const castles = piece === 'k' && ['g8', 'c8', 'g1', 'c1'].includes(to) ? ['O-O', 'O-O-O'] : [];
+    return [
+      baseMove,
+      capturingMove,
+      `${baseMove}+`,
+      `${baseMove}#`,
+      `${capturingMove}+`,
+      `${capturingMove}#`,
+      ...promotionPatterns(baseMove),
+      ...promotionPatterns(capturingMove),
+      ...castles,
     ];
-    return movesToCheck.some((item) => possibleMoves.includes(item));
+  };
+
+  const promotionPatterns = (baseMove: string) => {
+    return [`${baseMove}=Q`, `${baseMove}=Q+`, `${baseMove}=Q#`];
+  };
+
+  const generateCapturingPatterns = (to: string) => {
+    const piece = highlightedPiece?.piece ?? '';
+    const fromFile = highlightedPiece?.from[0] ?? '';
+    const capturingMove = piece === 'p' ? `${fromFile}x${to}` : `${piece.toUpperCase()}x${to}`;
+    return [
+      capturingMove,
+      `${capturingMove}+`,
+      `${capturingMove}#`,
+      ...promotionPatterns(capturingMove),
+    ];
   };
 
   return (
@@ -144,7 +167,7 @@ const GameProvider = ({ children }: { children: any }) => {
         chess,
         gameState,
         setGameState,
-        isPromotiong,
+        isPromoting,
         setIsPromoting,
         currentMove,
         setCurrentMove,
@@ -163,7 +186,10 @@ const GameProvider = ({ children }: { children: any }) => {
   );
 };
 
-const useGame = () => {
-  return useContext(GameContext);
+const useGame = (): GameContextProps => {
+  const context = useContext(GameContext);
+  if (!context) throw new Error('useGame must be used within a GameProvider');
+  return context;
 };
+
 export { GameProvider, useGame };
