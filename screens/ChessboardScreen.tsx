@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EndGame } from '@/components/Game/EndGame';
 import { GameProvider } from '@/hooks/useGame';
 
-export default function HomeScreen() {
+export const ChessboardScreen = () => {
   return (
     <SafeAreaView style={styles.root}>
       <GameProvider>
@@ -13,7 +13,7 @@ export default function HomeScreen() {
       </GameProvider>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   root: {

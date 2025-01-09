@@ -35,7 +35,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
   const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://192.168.1.102:8080');
+    const ws = new WebSocket('ws://192.168.100.40:8080');
     wsRef.current = ws;
 
     ws.onopen = () => {};
@@ -95,7 +95,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
         resetPositionSafely(resetPosition);
       }
     },
-    [chess]
+    [chess],
   );
 
   const resetPositionSafely = (resetPosition: () => void) => {
