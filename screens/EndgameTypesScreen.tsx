@@ -1,17 +1,24 @@
-// screens/EndgameTypesScreen.tsx
+import { useGame } from '@/hooks/useGame';
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 
 export const EndgameTypesScreen = ({ route, navigation }: { route: any; navigation: any }) => {
   const { difficulty } = route.params;
+  const { setDifficulty, setEndgameType } = useGame();
 
   const endgameTypes = {
-    Beginner: ['King and Pawn', 'Basic Checkmate'],
+    Beginner: ['Basic Checkmate', 'Advanced Checkmate'],
     Intermediate: ['Rook vs Pawn', 'Minor Piece Endgame'],
     Advanced: ['Queen vs Rook', 'Complex Rook Endgame'],
   };
 
-  const data = endgameTypes['Beginner'];
+  const data = endgameTypes[difficulty];
+
+  const handlePress = (endgameType: string) => {
+    setDifficulty(difficulty);
+    setEndgameType(endgameType);
+    navigation.navigate('Chessboard', { endgame: endgameType });
+  };
 
   return (
     <View style={styles.container}>
@@ -20,7 +27,7 @@ export const EndgameTypesScreen = ({ route, navigation }: { route: any; navigati
         data={data}
         keyExtractor={(item) => item}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => navigation.navigate('Chessboard', { endgame: item })}>
+          <TouchableOpacity onPress={() => handlePress(item)}>
             <Text style={styles.item}>{item}</Text>
           </TouchableOpacity>
         )}

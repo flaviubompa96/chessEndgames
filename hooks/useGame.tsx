@@ -20,6 +20,12 @@ interface GameContextProps {
   handlePromotingPiece: (piece: string) => void;
   checkPossibleMove: (to: string) => boolean;
   checkPossibleCapturingMove: (to: string) => boolean;
+  goNext: boolean;
+  handleGoNext: () => void;
+  setDifficulty: (value: string) => void;
+  setEndgameType: (value: string) => void;
+  campaignCompleted: boolean;
+  setCampaignCompleted: (value: boolean) => void;
 }
 
 const GameContext = createContext<GameContextProps | undefined>(undefined);
@@ -28,23 +34,50 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
   const chess = useConst(() => new Chess());
   const wsRef = useRef<WebSocket | null>(null);
 
-  const [gameState, setGameState] = useState<Game>({ player: 'w', board: chess.board() });
+  const [gameState, setGameState] = useState<Game>({
+    player: 'w',
+    board: chess.board(),
+  });
+
   const [isPromoting, setIsPromoting] = useState(false);
   const [currentMove, setCurrentMove] = useState<Move>();
   const [highlightedPiece, setHighlightedPiece] = useState<HighilghtedPiece | null>(null);
   const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
+  const [goNext, setGoNext] = useState(false);
+  const [campaignCompleted, setCampaignCompleted] = useState(false);
+  const [difficulty, setDifficulty] = useState('');
+  const [endgameType, setEndgameType] = useState('');
 
   useEffect(() => {
     const ws = new WebSocket('ws://192.168.100.40:8080');
     wsRef.current = ws;
 
-    ws.onopen = () => {};
-    ws.onmessage = (event) => handleStockfishMove(event.data);
-    ws.onclose = () => {};
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'start', difficulty: difficulty, endgameType: endgameType }));
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'start' && data.fen) {
+        chess.load(data.fen);
+        updateGameState();
+      } else if (data.type === 'move') {
+        handleStockfishMove(data.move);
+      } else if (data.type === 'end') {
+        if (data.campaignCompleted) {
+          setCampaignCompleted(true);
+        } else {
+          setGoNext(true);
+        }
+      }
+    };
+
+    ws.onclose = () => console.log('WebSocket closed');
     ws.onerror = (error) => console.error('WebSocket error:', error);
 
     return () => ws.close();
-  }, []);
+  }, [difficulty, endgameType]);
 
   const updateGameState = () => {
     setGameState({
@@ -54,7 +87,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleStockfishMove = (data: string) => {
-    const move = chess.move(data);
+    const move = data ? chess.move(data) : null;
     if (move) {
       updateGameState();
     } else {
@@ -66,7 +99,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
     const move = chess.move({ from, to });
     if (move) {
       updateGameState();
-      wsRef.current?.send(`${from}${to}`);
+      wsRef.current?.send(JSON.stringify({ type: 'move', move: `${from}${to}` }));
     } else {
       console.error('Invalid player move');
     }
@@ -107,7 +140,12 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
       const move = chess.move({ ...currentMove, promotion: piece[1] });
       if (move) {
         updateGameState();
-        wsRef.current?.send(`${move.from}${move.to}${piece[1].toLowerCase()}`);
+        wsRef.current?.send(
+          JSON.stringify({
+            type: 'promotion',
+            move: `${move.from}${move.to}${piece[1].toLowerCase()}`,
+          }),
+        );
       }
     }
     setIsPromoting(false);
@@ -161,6 +199,11 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
     ];
   };
 
+  const handleGoNext = () => {
+    wsRef.current?.send(JSON.stringify({ type: 'next' }));
+    setGoNext(false);
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -179,6 +222,12 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
         handlePromotingPiece,
         checkPossibleMove,
         checkPossibleCapturingMove,
+        goNext,
+        handleGoNext,
+        setDifficulty,
+        setEndgameType,
+        campaignCompleted,
+        setCampaignCompleted,
       }}
     >
       {children}

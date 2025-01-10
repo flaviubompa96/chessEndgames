@@ -9,10 +9,22 @@ import { useGame } from '@/hooks/useGame';
 import { PromotionDialog } from '../PromotionDialog/PromotionDialog';
 import { Piece } from '../Piece/Piece';
 import { Board } from '../Board/Board';
+import { Button } from '../Button/Button';
+import { useNavigation } from '@react-navigation/native';
 
 export const EndGame = () => {
-  //const chess = useConst(() => new Chess('1K6/7r/1k6/8/8/8/8/8 b KQkq - 0 1'))
-  const { chess, highlightedPiece, setPossibleMoves, gameState, isPromoting } = useGame();
+  const {
+    chess,
+    highlightedPiece,
+    setPossibleMoves,
+    gameState,
+    isPromoting,
+    goNext,
+    handleGoNext,
+    campaignCompleted,
+    setCampaignCompleted,
+  } = useGame();
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (highlightedPiece) {
@@ -23,6 +35,11 @@ export const EndGame = () => {
       setPossibleMoves(moves);
     }
   }, [highlightedPiece]);
+
+  const handleComplete = () => {
+    setCampaignCompleted(false);
+    navigation.goBack();
+  };
   return (
     <>
       <View style={styles.result}>
@@ -50,6 +67,10 @@ export const EndGame = () => {
         )}
       </View>
       {isPromoting ? <PromotionDialog color={getDifferentColor(gameState.player)} /> : null}
+      {goNext ? <Button label='Next' handlePress={() => handleGoNext()} /> : null}
+      {campaignCompleted ? (
+        <Button label='Complete campaign' handlePress={() => handleComplete()} />
+      ) : null}
     </>
   );
 };
