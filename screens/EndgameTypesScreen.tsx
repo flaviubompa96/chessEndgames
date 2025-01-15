@@ -1,18 +1,32 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useGame } from '@/hooks/useGame';
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 
 export const EndgameTypesScreen = ({ route, navigation }: { route: any; navigation: any }) => {
   const { difficulty } = route.params;
   const { setDifficulty, setEndgameType } = useGame();
+  const [endgameTypes, setEndgameTypes] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const endgameTypes = {
-    Beginner: ['Basic Checkmate', 'Advanced Checkmate'],
-    Intermediate: ['Rook vs Pawn', 'Minor Piece Endgame'],
-    Advanced: ['Queen vs Rook', 'Complex Rook Endgame'],
-  };
+  useEffect(() => {
+    const fetchEndgameTypes = async () => {
+      try {
+        const response = await fetch(`http://192.168.1.102:4000/endgames/${difficulty}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch endgame types');
+        }
+        const data = await response.json();
+        setEndgameTypes(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const data = endgameTypes[difficulty];
+    fetchEndgameTypes();
+  }, [difficulty]);
 
   const handlePress = (endgameType: string) => {
     setDifficulty(difficulty);
@@ -20,11 +34,27 @@ export const EndgameTypesScreen = ({ route, navigation }: { route: any; navigati
     navigation.navigate('Chessboard', { endgame: endgameType });
   };
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{difficulty} Endgames</Text>
       <FlatList
-        data={data}
+        data={endgameTypes}
         keyExtractor={(item) => item}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => handlePress(item)}>
@@ -51,5 +81,10 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     backgroundColor: '#f0f0f0',
     borderRadius: 5,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 18,
+    textAlign: 'center',
   },
 });

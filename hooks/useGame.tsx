@@ -3,6 +3,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { Chess, Move } from 'chess.js';
 import { useConst } from './useConst';
 import { Game, HighilghtedPiece } from '@/constants/types';
+import { ENV_URL } from '../env';
 
 interface GameContextProps {
   chess: Chess;
@@ -49,7 +50,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
   const [endgameType, setEndgameType] = useState('');
 
   useEffect(() => {
-    const ws = new WebSocket('ws://192.168.100.40:8080');
+    const ws = new WebSocket(ENV_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
