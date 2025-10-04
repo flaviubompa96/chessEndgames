@@ -1,20 +1,21 @@
 import React from 'react';
 import { View, Button, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 
-export default function HomeScreen({ navigation }: { navigation: any }) {
+export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Button
         title='Beginner'
-        onPress={() => navigation.navigate('EndgameTypes', { difficulty: 'Beginner' })}
+        onPress={() => router.push({ pathname: '/EndgameTypes', params: { difficulty: 'Beginner' } })}
       />
       <Button
         title='Intermediate'
-        onPress={() => navigation.navigate('EndgameTypes', { difficulty: 'Intermediate' })}
+        onPress={() => router.push({ pathname: '/EndgameTypes', params: { difficulty: 'Intermediate' } })}
       />
       <Button
         title='Advanced'
-        onPress={() => navigation.navigate('EndgameTypes', { difficulty: 'Advanced' })}
+        onPress={() => router.push({ pathname: '/EndgameTypes', params: { difficulty: 'Advanced' } })}
       />
     </View>
   );

@@ -3,7 +3,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { Chess, Move } from 'chess.js';
 import { useConst } from './useConst';
 import { Game, HighilghtedPiece } from '@/constants/types';
-import { ENV_URL } from '../env';
+import { ENV_WS_URL } from '../env';
 
 interface GameContextProps {
   chess: Chess;
@@ -27,6 +27,7 @@ interface GameContextProps {
   setEndgameType: (value: string) => void;
   campaignCompleted: boolean;
   setCampaignCompleted: (value: boolean) => void;
+  retryEndgame: () => void;
 }
 
 const GameContext = createContext<GameContextProps | undefined>(undefined);
@@ -50,7 +51,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
   const [endgameType, setEndgameType] = useState('');
 
   useEffect(() => {
-    const ws = new WebSocket(ENV_URL);
+    const ws = new WebSocket(ENV_WS_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -205,6 +206,29 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
     setGoNext(false);
   };
 
+  const retryEndgame = () => {
+    // Reset chess board to initial state
+    chess.reset();
+    updateGameState();
+    
+    // Clear all game state
+    setIsPromoting(false);
+    setCurrentMove(undefined);
+    setHighlightedPiece(null);
+    setPossibleMoves([]);
+    setGoNext(false);
+    setCampaignCompleted(false);
+    
+    // Restart the endgame with current difficulty and endgame type
+    if (wsRef.current && difficulty && endgameType) {
+      wsRef.current.send(JSON.stringify({ 
+        type: 'start', 
+        difficulty: difficulty, 
+        endgameType: endgameType 
+      }));
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -229,6 +253,7 @@ const GameProvider = ({ children }: { children: React.ReactNode }) => {
         setEndgameType,
         campaignCompleted,
         setCampaignCompleted,
+        retryEndgame,
       }}
     >
       {children}

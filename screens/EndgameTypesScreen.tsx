@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ENV_HTTP_URL } from '../env';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useGame } from '@/hooks/useGame';
 
@@ -12,7 +13,7 @@ export const EndgameTypesScreen = ({ route, navigation }: { route: any; navigati
   useEffect(() => {
     const fetchEndgameTypes = async () => {
       try {
-        const response = await fetch(`http://192.168.1.102:4000/endgames/${difficulty}`);
+        const response = await fetch(`${ENV_HTTP_URL}/endgames/${difficulty}`);
         if (!response.ok) {
           throw new Error('Failed to fetch endgame types');
         }
